@@ -1,1 +1,9 @@
-/backend/myenv
+/myenv
+.env
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+/backend/maillens_api.egg-info
