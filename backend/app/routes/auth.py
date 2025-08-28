@@ -84,7 +84,7 @@ async def google_callback(code: str | None = None, state: str | None = None, req
 
     # issue app session cookie for this user
     issue_session_cookie(response, str(user.id))
-
+    # return RedirectResponse("http://localhost:3000/auth/callback?success=true") ## when doing frontend
     # redirect back to web app (optional) — for now, return JSON
     return {"ok": True, "user_id": str(user.id), "email": email}
 

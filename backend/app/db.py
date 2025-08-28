@@ -1,7 +1,8 @@
 from contextlib import contextmanager
+from typing import Generator
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from .config import settings
 
@@ -15,8 +16,14 @@ class Base(DeclarativeBase):
 # Dependency for FastAPI routes
 
 
-@contextmanager
-def get_db():
+# # @contextmanager
+# def get_db():
+#     db = SessionLocal()
+#     try:
+#         yield db
+#     finally:
+#         db.close()
+def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db

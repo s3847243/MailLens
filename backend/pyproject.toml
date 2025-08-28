@@ -19,6 +19,11 @@ dependencies = [
   "pydantic-settings==2.5.2",
   "python-jose[cryptography]==3.3.0",
   "passlib[bcrypt]==1.7.4",
+  "httpx==0.27.2",
+  "pinecone==5.0.1", 
+  "tenacity==8.5.0" ,
+  "celery[redis]==5.4.0", # ← add
+  "redis==5.0.7" # ← add (optional explicit)
 ]
 
 [tool.setuptools.packages.find]
