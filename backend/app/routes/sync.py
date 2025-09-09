@@ -10,7 +10,6 @@ router = APIRouter(prefix="/sync", tags=["sync"])
 
 
 async def _run_initial(acct_id: str):
-    # IMPORTANT: create a fresh DB session in the background task
     db = SessionLocal()
     try:
         acct = db.query(models.GmailAccount).filter(

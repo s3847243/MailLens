@@ -26,7 +26,7 @@ def _strip_html(html: str) -> str:
 
 
 def parse_message(gmsg: Dict[str, Any]) -> Tuple[Dict[str, str], str, str]:
-    """Extract headers map, plain text body, and html body from Gmail FULL message."""
+
     payload = gmsg.get("payload", {})
     headers_list = payload.get("headers", [])
     headers = {h.get("name", "").lower(): h.get("value", "")
@@ -51,7 +51,7 @@ def parse_message(gmsg: Dict[str, Any]) -> Tuple[Dict[str, str], str, str]:
                 return res
         return None
     body_text = body_html = None
-    # single-part case
+
     if payload.get("body", {}).get("data"):
         mime = (payload.get("mimeType") or "").lower()
         raw = _b64url_decode(payload["body"]["data"]).decode(errors="ignore")

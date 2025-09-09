@@ -23,3 +23,77 @@ services:
 
 volumes:
   pgdata:
+
+
+#   version: "3.9"
+# services:
+# postgres:
+# image: postgres:16
+# container_name: maillens-postgres
+# restart: unless-stopped
+# environment:
+# POSTGRES_USER: maillens
+# POSTGRES_PASSWORD: maillens
+# POSTGRES_DB: maillens
+# ports: ["5432:5432"]
+# volumes: ["pgdata:/var/lib/postgresql/data"]
+
+
+# redis:
+# image: redis:7-alpine
+# container_name: maillens-redis
+# restart: unless-stopped
+# ports: ["6379:6379"]
+
+
+# # Optional: run API in Docker too; else run it on host
+# api:
+# image: python:3.11-slim
+# container_name: maillens-api
+# working_dir: /srv/api
+# volumes:
+# - ../api:/srv/api
+# environment:
+# - PYTHONUNBUFFERED=1
+# - DATABASE_URL=postgresql+psycopg://maillens:maillens@postgres:5432/maillens
+# - REDIS_URL=redis://redis:6379/0
+# - CELERY_BROKER_URL=redis://redis:6379/1
+# - CELERY_RESULT_BACKEND=redis://redis:6379/2
+# - CELERY_TIMEZONE=Australia/Melbourne
+# - CELERY_SCHEDULE_MINUTES=15
+# depends_on: [postgres, redis]
+# command: >
+# bash -lc "pip install -e . && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+# ports:
+# - "8000:8000"
+
+
+# worker:
+# image: python:3.11-slim
+# container_name: maillens-worker
+# working_dir: /srv/api
+# volumes:
+# - ../api:/srv/api
+# environment:
+# - PYTHONUNBUFFERED=1
+# - DATABASE_URL=postgresql+psycopg://maillens:maillens@postgres:5432/maillens
+# - REDIS_URL=redis://redis:6379/0
+# - CELERY_BROKER_URL=redis://redis:6379/1
+# - CELERY_RESULT_BACKEND=redis://redis:6379/2
+# depends_on: [postgres, redis]
+# command: >
+# bash -lc "pip install -e . && celery -A app.celery_app.celery_app worker --loglevel=INFO --pool=solo"
+
+
+# beat:
+# image: python:3.11-slim
+# container_name: maillens-beat
+# working_dir: /srv/api
+# volumes:
+# - ../api:/srv/api
+# environment:
+# - PYTHONUNBUFFERED=1
+# - CELERY_BROKER_URL=redis://redis:6379/1
+# - CELERY_RESULT_BACKEND=redis://redis:6379/2
+# - CELERY_TIMEZONE=Australia/Melbourne
+# pgdata:

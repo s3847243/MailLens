@@ -22,8 +22,12 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow)
 
-    gmail_accounts = relationship("GmailAccount", back_populates="user")
-    chat_sessions = relationship("ChatSession", back_populates="user")
+    gmail_accounts = relationship("GmailAccount", back_populates="user",
+                                  cascade="all, delete-orphan",
+                                  passive_deletes=True)
+    chat_sessions = relationship("ChatSession", back_populates="user",
+                                 cascade="all, delete-orphan",
+                                 passive_deletes=True)
 
 
 class GmailAccount(Base):
@@ -47,7 +51,9 @@ class GmailAccount(Base):
         DateTime(timezone=True))
 
     user = relationship("User", back_populates="gmail_accounts")
-    emails = relationship("EmailMessage", back_populates="gmail_account")
+    emails = relationship("EmailMessage", back_populates="gmail_account",
+                          cascade="all, delete-orphan",
+                          passive_deletes=True)
 
     __table_args__ = (
         UniqueConstraint("user_id", "google_user_id",
@@ -112,7 +118,9 @@ class ChatSession(Base):
         DateTime(timezone=True), default=datetime.utcnow)
 
     user = relationship("User", back_populates="chat_sessions")
-    messages = relationship("ChatMessage", back_populates="chat_session")
+    messages = relationship("ChatMessage", back_populates="chat_session",
+                            cascade="all, delete-orphan",
+                            passive_deletes=True)
 
 
 class ChatMessage(Base):
@@ -136,6 +144,5 @@ class ChatMessage(Base):
     chat_session = relationship("ChatSession", back_populates="messages")
 
 
-# Helpful composite indexes
 Index("ix_chat_messages_session_created",
       ChatMessage.chat_session_id, ChatMessage.created_at)

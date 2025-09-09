@@ -7,3 +7,8 @@ __pycache__/
 *$py.class
 
 /backend/maillens_api.egg-info
+
+celerybeat-schedule
+celerybeat-schedule.dat
+celerybeat-schedule.dir
+celerybeat-schedule.bak

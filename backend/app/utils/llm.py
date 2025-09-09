@@ -5,17 +5,20 @@ from typing import Any, AsyncGenerator, Dict, List
 
 from openai import AsyncOpenAI
 
+from ..config import settings
+
 _client: AsyncOpenAI | None = None
 
 
 def client() -> AsyncOpenAI:
     global _client
     if _client is None:
-        _client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        _client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
     return _client
 
 
-DEFAULT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")
+DEFAULT_MODEL = settings.OPENAI_CHAT_MODEL if hasattr(
+    settings, 'OPENAI_CHAT_MODEL') else 'gpt-4o-mini'
 
 
 async def stream_chat(messages: List[Dict[str, str]], model: str | None = None) -> AsyncGenerator[str, None]:

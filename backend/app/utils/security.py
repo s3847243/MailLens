@@ -6,7 +6,6 @@ from cryptography.fernet import Fernet
 from ..config import settings
 
 if not settings.ENCRYPTION_KEY:
-    # In dev we can lazily allow None but raise helpful error at first use
     pass
 
 

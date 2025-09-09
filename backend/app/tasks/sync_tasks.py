@@ -11,7 +11,7 @@ from ..db import SessionLocal
 from ..services.sync_service import SyncService
 
 
-@shared_task(name="incremental_sync_account")
+@shared_task
 def incremental_sync_account(acct_id: str):
     """Run incremental sync for a single Gmail account."""
     db: Session = SessionLocal()
@@ -29,7 +29,7 @@ def incremental_sync_account(acct_id: str):
         db.close()
 
 
-@shared_task(name="schedule_incremental_for_all")
+@shared_task
 def schedule_incremental_for_all():
     """Enqueue per-account incremental syncs.
     This is idempotent and safe to run periodically.

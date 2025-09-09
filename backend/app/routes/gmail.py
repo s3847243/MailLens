@@ -31,7 +31,7 @@ async def list_ids(request: Request, db: Session = Depends(get_db)):
     ids = []
     async for mid in client.list_message_ids():
         ids.append(mid)
-    return {"count": len(ids), "ids": ids[:50]}  # preview first 50
+    return {"count": len(ids), "ids": ids[:50]}
 
 
 @router.get("/message/{message_id}")

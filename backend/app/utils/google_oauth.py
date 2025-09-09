@@ -9,7 +9,14 @@ AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
 
-SCOPES = (settings.GOOGLE_OAUTH_SCOPES or "").split()
+# SCOPES = (settings.GOOGLE_OAUTH_SCOPES or "").split()
+
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "openid"
+]
 
 
 def build_auth_url(state: str) -> str:
@@ -19,11 +26,13 @@ def build_auth_url(state: str) -> str:
         "response_type": "code",
         "scope": " ".join(SCOPES),
         "access_type": "offline",
-        "prompt": "consent",
+        "prompt": "consent select_account",
         "include_granted_scopes": "true",
         "state": state,
     }
-    return f"{AUTH_URL}?{urlencode(params)}"
+    url = f"{AUTH_URL}?{urlencode(params)}"
+    print(f"Auth URL: {url}")
+    return url
 
 
 async def exchange_code_for_tokens(code: str):
@@ -38,7 +47,6 @@ async def exchange_code_for_tokens(code: str):
         r = await client.post(TOKEN_URL, data=data)
         r.raise_for_status()
         payload = r.json()
-        # normalize
         access_token = payload["access_token"]
         refresh_token = payload.get("refresh_token")
         expires_in = payload.get("expires_in", 3600)

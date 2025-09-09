@@ -23,7 +23,9 @@ dependencies = [
   "pinecone==5.0.1", 
   "tenacity==8.5.0" ,
   "celery[redis]==5.4.0", # ← add
-  "redis==5.0.7" # ← add (optional explicit)
+  "redis==5.0.7",
+  "google-api-python-client>=2.0.0" ,
+  "tiktoken>=0.5.0",
 ]
 
 [tool.setuptools.packages.find]

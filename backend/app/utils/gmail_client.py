@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, Optional
 
@@ -11,9 +12,10 @@ from .security import decrypt, encrypt
 GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 
+logger = logging.getLogger(__name__)
+
 
 class GmailClient:
-    """Minimal Gmail client that auto-refreshes access tokens and wraps key endpoints."""
 
     def __init__(self, db: Session, acct: models.GmailAccount):
         self.db = db
@@ -21,11 +23,10 @@ class GmailClient:
 
     async def _ensure_token(self):
         now = datetime.now(timezone.utc)
-        # Refresh 5 minutes early
         if self.acct.expiry and self.acct.expiry - now > timedelta(minutes=5):
             return
         if not self.acct.refresh_token:
-            return  # cannot refresh
+            return
         refresh = decrypt(self.acct.refresh_token)
         async with httpx.AsyncClient(timeout=20) as client:
             data = {
@@ -40,7 +41,6 @@ class GmailClient:
             access_token = payload["access_token"]
             expires_in = payload.get("expires_in", 3600)
             new_expiry = now + timedelta(seconds=expires_in)
-            # persist new token/expiry
             self.acct.access_token = encrypt(access_token)
             self.acct.expiry = new_expiry
             self.db.add(self.acct)
@@ -57,6 +57,12 @@ class GmailClient:
         """Yield Gmail message IDs (IDs only) with optional query/labels."""
         url = f"{GMAIL_API}/me/messages"
         headers = await self._auth_headers()
+        live_token = headers["Authorization"].split()[-1]
+
+        async with httpx.AsyncClient() as c:
+            info = (await c.get("https://oauth2.googleapis.com/tokeninfo",
+                                params={"access_token": live_token})).json()
+        print("LIST MESSAGE IDS LIVE token scopes:", info.get("scope"))
         params: Dict[str, Any] = {"maxResults": 500}
         if q:
             params["q"] = q
@@ -68,7 +74,14 @@ class GmailClient:
                 if next_token:
                     params["pageToken"] = next_token
                 r = await client.get(url, headers=headers, params=params)
-                r.raise_for_status()
+                try:
+                    r.raise_for_status()
+                except httpx.HTTPStatusError as e:
+                    try:
+                        print("Gmail error JSON:", e.response.json())
+                    except Exception:
+                        print("Gmail error text:", e.response.text)
+                    raise
                 data = r.json()
                 for m in data.get("messages", []):
                     yield m["id"]
@@ -79,10 +92,24 @@ class GmailClient:
     async def get_message_full(self, message_id: str) -> Dict[str, Any]:
         url = f"{GMAIL_API}/me/messages/{message_id}"
         headers = await self._auth_headers()
+        live_token = headers["Authorization"].split()[-1]
+
+        async with httpx.AsyncClient() as c:
+            info = (await c.get("https://oauth2.googleapis.com/tokeninfo",
+                                params={"access_token": live_token})).json()
+        print("LIVE token scopes:", info.get("scope"))
         params = {"format": "FULL"}
         async with httpx.AsyncClient(timeout=30) as client:
-            r = await client.get(url, headers=headers, params=params)
-            r.raise_for_status()
+            try:
+                # use lowercase
+                r = await client.get(url, headers=headers, params=params)
+                r.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                try:
+                    print("Gmail get error:", e.response.json())
+                except Exception:
+                    print("Gmail get error text:", e.response.text)
+                raise
             return r.json()
 
     async def get_history(self, start_history_id: str, page_token: Optional[str] = None) -> Dict[str, Any]:
@@ -90,14 +117,16 @@ class GmailClient:
         headers = await self._auth_headers()
         params: Dict[str, Any] = {
             "startHistoryId": start_history_id,
-            "historyTypes": ["messageAdded", "messageDeleted", "labelsAdded", "labelsRemoved"],
+            "historyTypes": ["messageAdded", "messageDeleted", "labelAdded", "labelRemoved"],
             "maxResults": 1000,
         }
+        logger.info("r.json()")
         if page_token:
             params["pageToken"] = page_token
         async with httpx.AsyncClient(timeout=30) as client:
             r = await client.get(url, headers=headers, params=params)
             r.raise_for_status()
+            logger.info("r.json() ", r.json())
             return r.json()
 
     async def get_profile(self) -> Dict[str, Any]:

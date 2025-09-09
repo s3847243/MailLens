@@ -9,36 +9,93 @@ from .. import models
 from ..utils.embeddings import embed_text
 from ..utils.vectorstore import query_top_k
 
-# Basic byte budget for context to avoid over-long prompts
 MAX_CONTEXT_CHARS = 8000
 MAX_HISTORY_CHARS = 6000
 MAX_TURNS = 6  # include last N prior messages (user/assistant)
 SYSTEM_PROMPT = (
     "You are MailLens, an email research assistant. Use the provided email excerpts when relevant. "
-    "Cite sources with bracketed numbers like [1], [2]. Be concise and do not fabricate details."
+    "Cite sources with bracketed numbers like [1], [2]. Be concise and do not fabricate details. If you find the question irrelevant to the excerpts then reply by saying - Please ask questions relevant to the emails."
 )
 
 
-def _build_context_and_pills(db: Session, acct_id: str, matches) -> Tuple[str, List[Dict[str, Any]]]:
-    """Hydrate top-K matches into a context string and a list of citation pills."""
-    ids = [m.id for m in matches]
-    if not ids:
+def collapse_chunk_matches_to_messages(matches: List[Any], top_k_messages: int = 8, min_score: float = 0.2
+                                       ) -> List[Tuple[str, float, Any]]:
+    """
+    Normalize Pinecone matches (which are chunk-level) into distinct message_ids.
+    Returns a list of (message_id, best_score, best_match_obj), sorted by score desc.
+    """
+    best: Dict[str, Tuple[float, Any]] = {}
+    for m in matches or []:
+        md = getattr(m, "metadata", {}) or {}
+        mid = md.get("message_id")
+        if not mid:
+            _id = getattr(m, "id", "") or ""
+            mid = _id.split("#", 1)[0] if "#" in _id else _id
+        if not mid:
+            continue
+
+        score = float(getattr(m, "score", 0.0) or 0.0)
+        if score < min_score:
+            continue
+
+        prev = best.get(mid)
+        if (not prev) or score > prev[0]:
+            best[mid] = (score, m)
+
+    rows: List[Tuple[str, float, Any]] = sorted(
+        [(mid, sc, mm) for mid, (sc, mm) in best.items()],
+        key=lambda t: t[1],
+        reverse=True
+    )
+    return rows[:top_k_messages]
+
+
+def build_context_and_pills_from_message_ids(
+    db: Session,
+    acct_id,
+    message_rows: List[Tuple[str, float, Any]],
+    body_chars: int = 800
+) -> tuple[str, list[dict]]:
+    """
+    Given (message_id, score, match) tuples, hydrate rows and build:
+      - context: a stitched string the LLM can read
+      - pills:   metadata for UI
+    """
+    mids = [mid for (mid, _, _) in message_rows]
+    if not mids:
         return "", []
+
     rows = (
         db.query(models.EmailMessage)
-        .filter(models.EmailMessage.message_id.in_(ids), models.EmailMessage.gmail_account_id == acct_id)
+        .filter(
+            models.EmailMessage.gmail_account_id == acct_id,
+            models.EmailMessage.message_id.in_(mids),
+        )
         .all()
     )
-    # preserve match order
-    by_id = {r.message_id: r for r in rows}
+    by_mid = {r.message_id: r for r in rows}
+
     context_parts: List[str] = []
-    pills: List[Dict[str, Any]] = []
-    total = 0
-    for idx, m in enumerate(matches, start=1):
-        r = by_id.get(m.id)
+    pills: List[dict] = []
+
+    rank = 0
+    for mid, score, match in message_rows:
+        r = by_mid.get(mid)
         if not r:
             continue
-        # pill first; will be returned at the end
+        rank += 1
+        body_preview = (r.body_text or r.snippet or "")[:body_chars].strip()
+
+        context_parts.append(
+            f"=== Email #{rank} ===\n"
+            f"Subject: {r.subject or '(no subject)'}\n"
+            f"From: {r.from_addr or ''}\n"
+            f"To: {r.to_addr or ''}\n"
+            f"Date: {r.date.isoformat() if r.date else ''}\n"
+            f"Snippet: {r.snippet or ''}\n"
+            f"Excerpt:\n{body_preview}\n"
+        )
+
         pills.append({
             "id": str(r.id),
             "messageId": r.message_id,
@@ -47,19 +104,12 @@ def _build_context_and_pills(db: Session, acct_id: str, matches) -> Tuple[str, L
             "from": r.from_addr,
             "date": (r.date.isoformat() if r.date else None),
             "snippet": r.snippet,
-            "score": float(m.score) if hasattr(m, "score") else None,
+            "score": score,
             "source": "Gmail",
         })
-        # context excerpt (trim body)
-        body = r.body_text or ""
-        excerpt = body[:1500]
-        block = f"[{idx}] Subject: {r.subject or ''}\nFrom: {r.from_addr or ''}\nDate: {r.date.isoformat() if r.date else ''}\n---\n{excerpt}\n\n"
-        if total + len(block) <= MAX_CONTEXT_CHARS:
-            context_parts.append(block)
-            total += len(block)
-        else:
-            break
-    return "".join(context_parts), pills
+
+    context = "\n".join(context_parts)
+    return context, pills
 
 
 def _load_chat_history(db: Session, chat_id: str) -> List[Dict[str, str]]:
@@ -70,13 +120,11 @@ def _load_chat_history(db: Session, chat_id: str) -> List[Dict[str, str]]:
         .order_by(models.ChatMessage.created_at.asc())
         .all()
     )
-    # keep the last MAX_TURNS*2 messages (user+assistant pairs)
     msgs = msgs[-MAX_TURNS*2:]
 
     def clean(content: str | None) -> str:
 
         c = (content or "").strip()
-        # avoid pushing prior citation JSON into prompt
         return c[:2000]
 
     out: List[Dict[str, str]] = []
@@ -84,11 +132,9 @@ def _load_chat_history(db: Session, chat_id: str) -> List[Dict[str, str]]:
         if m.role not in {"user", "assistant", "system"}:
             continue
         if m.role == "assistant" and m.citations:
-            # strip any citation rendering text if present in content (we keep it simple)
             pass
     out.append({"role": m.role, "content": clean(m.content)})
 
-    # Trim to budget
     total = 0
     trimmed: List[Dict[str, str]] = []
     for m in reversed(out):  # start from latest

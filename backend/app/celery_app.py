@@ -4,8 +4,8 @@ import os
 
 from celery import Celery
 
-broker_url = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/1")
-result_backend = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/2")
+broker_url = "redis://localhost:6379/1"
+result_backend = "redis://localhost:6379/2"
 timezone = os.getenv("CELERY_TIMEZONE", "Australia/Melbourne")
 celery_app = Celery("maillens", broker=broker_url, backend=result_backend)
 celery_app.conf.update(
@@ -17,11 +17,10 @@ celery_app.conf.update(
 )
 
 # Autodiscover tasks in app.tasks package
-celery_app.autodiscover_tasks(["app.tasks"])  # looks for @shared_task
+celery_app.autodiscover_tasks(["app.tasks"])
 
-# at the bottom of celery_app.py
 try:
-    import app.tasks.beat_schedule  # noqa: F401
+    import app.tasks.beat_schedule
+    from app.tasks import sync_tasks
 except Exception:
-    # beat can still run without a schedule (e.g., env disables it)
     pass

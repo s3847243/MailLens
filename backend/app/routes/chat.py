@@ -12,15 +12,16 @@ from sqlalchemy.orm import Session
 
 from .. import models
 from ..db import get_db
-from ..services.rag import (_build_context_and_pills, _load_chat_history,
-                            build_messages)
+from ..services.rag import (_load_chat_history,
+                            build_context_and_pills_from_message_ids,
+                            build_messages, collapse_chunk_matches_to_messages)
 from ..utils.embeddings import embed_text
 from ..utils.jwt import get_user_id_from_cookie
 from ..utils.llm import stream_chat
+from ..utils.time import utcnow
 from ..utils.vectorstore import query_top_k
 
 router = APIRouter(prefix="/chats", tags=["chat"])
-# --- helpers ---
 
 
 def _require_user(request: Request) -> str:
@@ -30,8 +31,6 @@ def _require_user(request: Request) -> str:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="Not authenticated")
     return uid
-
-# --- CRUD ---
 
 
 @router.post("")
@@ -66,15 +65,14 @@ async def delete_chat(chat_id: str, request: Request, db: Session = Depends(get_
     )
     if not row:
         raise HTTPException(status_code=404, detail="Chat not found")
-    # cascade via ORM relationship is not configured here; delete messages manually or rely on FK cascade if set
     db.delete(row)
     db.commit()
     return {"ok": True}
 # --- SSE ask ---
 
 
-@router.post("/{chat_id}/ask")
-async def chat_ask(chat_id: str, request: Request, db: Session = Depends(get_db)):
+@router.get("/{chat_id}/ask")
+async def chat_ask(chat_id: str, request: Request, q: str, db: Session = Depends(get_db)):
     uid = _require_user(request)
     chat = (
         db.query(models.ChatSession)
@@ -83,13 +81,13 @@ async def chat_ask(chat_id: str, request: Request, db: Session = Depends(get_db)
     )
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
+    chat_id_str = str(chat.id)
+    chat_title = chat.title
 
-    payload = await request.json()
-    question = (payload.get("q") or "").strip()
+    question = q.strip()
     if not question:
         raise HTTPException(status_code=400, detail="Empty question")
 
-    # persist user message
     user_msg = models.ChatMessage(
         chat_session_id=chat.id,
         role="user",
@@ -98,52 +96,68 @@ async def chat_ask(chat_id: str, request: Request, db: Session = Depends(get_db)
     )
     db.add(user_msg)
     db.commit()
-    # find the gmail account for this user
     acct = db.query(models.GmailAccount).filter(
         models.GmailAccount.user_id == uid).first()
     if not acct:
         raise HTTPException(status_code=400, detail="No linked Gmail account")
+    history = _load_chat_history(db, chat_id_str)  # load NOW
 
     async def event_stream() -> AsyncGenerator[bytes, None]:
-        # 1) notify searching state
         yield b"event: state\n"
         yield b"data: {\"value\": \"searching\"}\n\n"
-        # 2) retrieval
         qvec = await embed_text(question)
         matches = []
         if qvec is not None:
-            matches = await query_top_k(namespace=str(acct.id), vector=qvec, top_k=8)
-        context, pills = _build_context_and_pills(
-            db, acct_id=acct.id, matches=matches)
-        # load prior chat history (after we've just saved the user message)
-        history = _load_chat_history(db, str(chat.id))
+            matches = await query_top_k(
+                namespace=str(acct.id),
+                vector=qvec,
+                top_k=24,
+                filter={"type": {"$eq": "email_chunk"}},
+            )
+
+        msg_rows = collapse_chunk_matches_to_messages(
+            matches, top_k_messages=8, min_score=0.2)
+        context, pills = build_context_and_pills_from_message_ids(
+            db, acct_id=acct.id, message_rows=msg_rows)
+
         yield b"event: state\n"
         yield b"data: {\"value\": \"answering\"}\n\n"
-        # 3) stream LLM tokens
-        messages = build_messages(question, context)
-        assistant_text_parts: list[str] = []
-        async for delta in stream_chat(messages):
-            assistant_text_parts.append(delta)
-            packet = json.dumps({"delta": delta})
-            yield b"event: message\n" + (b"data: " + packet.encode("utf-8") + b"\n\n")
 
-        final_text = "".join(assistant_text_parts)
-        # 4) persist assistant message with citations
-        asst_msg = models.ChatMessage(
-            chat_session_id=chat.id,
-            role="assistant",
-            content=final_text,
-            citations=pills,  # store the pills as JSONB
-            created_at=datetime.now(timezone.utc),
-        )
-        db.add(asst_msg)
-        # update chat title on first question
-        if not chat.title:
-            chat.title = question[:60]
-        chat.updated_at = datetime.now(timezone.utc)
-        db.add(chat)
-        db.commit()
-        # 5) send final event with citations
+        msgs = build_messages(user_query=question,
+                              context=context, history=history)
+
+        parts: list[str] = []
+        async for delta in stream_chat(msgs):
+            # async for delta in stream_chat(build_messages(q, context, history=history)):
+            parts.append(delta)
+            yield b"event: message\ndata: " + json.dumps({"delta": delta}).encode() + b"\n\n"
+        final_text = "".join(parts)
+
+        from app.db import SessionLocal
+        with SessionLocal() as db2:
+            asst_msg = models.ChatMessage(
+                chat_session_id=chat_id_str,
+                role="assistant",
+                content=final_text,
+                citations=pills,
+                created_at=utcnow(),
+            )
+            db2.add(asst_msg)
+            # update title if empty
+            db2.query(models.ChatSession).filter(
+                models.ChatSession.id == chat_id_str,
+                models.ChatSession.user_id == uid,
+            ).update(
+                {
+                    models.ChatSession.title: (q[:60] if not chat_title else chat_title),
+                    models.ChatSession.updated_at: utcnow(),
+                }
+            )
+            db2.commit()
+
+        chat_payload = {"id": chat_id_str, "title": (
+            q[:60] if not chat_title else chat_title), "updated_at": utcnow().isoformat()}
+        yield b"event: chat\n" + b"data: " + json.dumps(chat_payload).encode("utf-8") + b"\n\n"
         final_packet = json.dumps({"citations": pills})
         yield b"event: final\n" + (b"data: " + final_packet.encode("utf-8") + b"\n\n")
 
@@ -174,13 +188,11 @@ async def list_chat_messages(
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
 
-    # Build base query
     q = (
         db.query(models.ChatMessage)
         .filter(models.ChatMessage.chat_session_id == chat_id)
     )
 
-    # Cursor pagination (after = message_id)
     if after:
         anchor = (
             db.query(models.ChatMessage)
@@ -190,7 +202,6 @@ async def list_chat_messages(
         if not anchor:
             raise HTTPException(
                 status_code=400, detail="Invalid 'after' cursor")
-        # Return messages strictly after the anchor (by created_at, then id)
         q = q.filter(
             or_(
                 models.ChatMessage.created_at > anchor.created_at,
@@ -201,19 +212,17 @@ async def list_chat_messages(
             )
         )
 
-    # Oldest-first for easy rendering
     q = q.order_by(models.ChatMessage.created_at.asc(),
                    models.ChatMessage.id.asc()).limit(limit)
 
     rows: List[models.ChatMessage] = q.all()
 
-    # Prepare a next cursor if there might be more
     next_cursor = rows[-1].id if rows and len(rows) == limit else None
 
     def serialize(m: models.ChatMessage):
         return {
             "id": str(m.id),
-            "role": m.role,                    # "user" | "assistant"
+            "role": m.role,
             "content": m.content,
             # JSONB pills for assistant turns (may be [])
             "citations": m.citations or [],

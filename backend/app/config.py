@@ -8,11 +8,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 class Settings(BaseSettings):
 
     DATABASE_URL: str
-    REDIS_URL: str = "redis://localhost:6379/0"
-    ALLOW_ORIGIN: str = "http://localhost:3000"
+    REDIS_URL: str
+    ALLOW_ORIGIN: str
 
-    JWT_SECRET: str = "dev-secret"
-    SESSION_COOKIE_NAME: str = "maillens_session"
+    JWT_SECRET: str
+    SESSION_COOKIE_NAME: str
     GOOGLE_CLIENT_ID: str | None = None
     GOOGLE_CLIENT_SECRET: str | None = None
     GOOGLE_REDIRECT_URI: str | None = None
@@ -23,7 +23,9 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str | None = None
     EMBEDDING_DIM: int | None = None
     ENCRYPTION_KEY: str | None = None
-    APP_BASE_URL: str = "http://localhost:3000"
+    APP_BASE_URL: str
+    OPENAI_API_KEY: str | None = None
+    OPENAI_CHAT_MODEL: str | None = None
 
     class Config:
         env_file = str(BASE_DIR / ".env")
