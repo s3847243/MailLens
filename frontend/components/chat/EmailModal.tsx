@@ -31,8 +31,11 @@ export default function EmailModal({ open, onClose, pill }: Props) {
         const data = await getEmailByDbId(pill.id)
         console.log(data)
         if (!cancelled) setEmail(data)
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || 'Failed to load email')
+      } catch (e: unknown) {
+        if (!cancelled) {
+          const errorMessage = e instanceof Error ? e.message : 'Failed to load email'
+          setError(errorMessage)
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }

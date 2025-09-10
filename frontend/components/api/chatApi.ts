@@ -1,6 +1,6 @@
 import { api } from "./axiosInstance"
 
-export const createChatSessions = async ():Promise<any> =>{
+export const createChatSessions = async () =>{
     try{
         const response = await api.post('/chats');
 
@@ -12,7 +12,7 @@ export const createChatSessions = async ():Promise<any> =>{
         
     }
 }
-export const getChatSessions = async():Promise<any> =>{
+export const getChatSessions = async() =>{
     try{
         const response = await api.get('/chats');
         console.log(response.data)
@@ -25,7 +25,7 @@ export const getChatSessions = async():Promise<any> =>{
 
 }
 
-export const deleteChat = async(id:string):Promise<any> =>{
+export const deleteChat = async(id:string) =>{
     try{
         const response = await api.delete(`/chats/${id}`);
         console.log(response.data)

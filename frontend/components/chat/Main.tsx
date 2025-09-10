@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Textarea } from '../ui/textarea';
 import { HiStop } from "react-icons/hi2";
 import { FaArrowTurnUp } from "react-icons/fa6";
@@ -24,23 +24,19 @@ interface Message {
 type Params = { id: string };
 
 const Main = () => {
-  // Refs and state
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
-  const params = useParams();
   const [isGenerating, setIsGenerating] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [chatExists, setChatExists] = useState(false);
   const [showChatSetup, setShowChatSetup] = useState(false);
-  const [chatTitle, setChatTitle] = useState('');
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [isMessageLoading, setIsMessageLoading] = useState(false);
   const [isNearBottom, setIsNearBottom] = useState(true);
-  const [unseenCount, setUnseenCount] = useState(0);
   const { updateChatMeta } = useChatSessions()
-  const { start, stop } = useAskStream()
+  const { start } = useAskStream()
   const initialChatIdRef = useRef<string | null>(null);
   const [previewCitation, setPreviewCitation] = useState<CitationPill | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
@@ -66,19 +62,14 @@ const Main = () => {
   useEffect(() => {
     scrollToBottom("auto");
   }, []);
-  useEffect(() => {
-    if (isNearBottom) setUnseenCount(0);
-  }, [isNearBottom]);
+
 
   useEffect(() => {
     if (forceScrollRef.current || isNearBottom) {
       scrollToBottom();       
-      setUnseenCount(0);
       forceScrollRef.current = false;
-    } else {
-      setUnseenCount((c) => c + 1);
-    }
-  }, [messages, isMessageLoading]);
+    } 
+  }, [messages, isMessageLoading, isNearBottom]);
 
   useEffect(() => {
     const onResize = () => {
@@ -87,14 +78,14 @@ const Main = () => {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
-
+  
   const { id } = useParams<Params>();
 
   if (id && !initialChatIdRef.current) {
     initialChatIdRef.current = id;
   }
   const chatId = id ?? initialChatIdRef.current;
-  const loadExistingChat = async (chatId: string) => {
+  const loadExistingChat = useCallback(async (chatId: string) => {
     try {
       setIsLoading(true);
       const response = await fetch(`http://localhost:8000/api/chats/${chatId}/messages`, {
@@ -123,7 +114,7 @@ const Main = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [router, setIsLoading, setMessages, setChatExists]);
   const startNewChat = async () => {
     try {
       setIsCreatingChat(true);
@@ -160,7 +151,7 @@ const sendMessage = (question: string) => {
     setInputValue('')
 
     // assistant streaming state
-    let assistantId = `a_${Date.now()}`
+    const assistantId = `a_${Date.now()}`
     let assistantBuffer = ''
     let assistantShown = false
 
@@ -180,7 +171,7 @@ const sendMessage = (question: string) => {
       onOpen: () => {
         console.log("searching")
       },
-      onState: (v) => {
+      onState: () => {
         // 'searching' | 'answering' 
         
       },
@@ -243,7 +234,7 @@ useEffect(() => {
     };
 
     initializeChat();
-  }, [id]);
+  }, [id, loadExistingChat]);
   const adjustTextareaHeight = () => {
     const textarea = textareaRef.current;
     if (textarea) {

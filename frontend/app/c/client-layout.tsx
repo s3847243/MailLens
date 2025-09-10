@@ -1,19 +1,15 @@
 // app/chat/ClientLayout.tsx
 "use client";
-import { SidebarProvider, SidebarTrigger, useSidebar,SidebarInset } from "@/components/ui/sidebar";
+import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import { SearchEmails } from "@/components/search/Search";
-import { ChatSession } from "@/types";
-import { deleteChat, getChatSessions } from "@/components/api/chatApi";
 import { useChatSessions } from "@/context/ChatSessionContext";
 export default  function ClientLayout({ children }: { children: React.ReactNode }) {
   const { open } = useSidebar();
   const { chatSessions, refreshChats, deleteSession } = useChatSessions()
-
-  const [isLoading, setIsLoading] = useState(true);
   const pathname = usePathname();
   const router = useRouter();
   useEffect(() => { void refreshChats() }, [refreshChats]) 

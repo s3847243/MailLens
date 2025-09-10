@@ -3,7 +3,6 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { api } from '@/components/api/axiosInstance'
 
 const GoogleIcon = () => (
@@ -67,7 +66,6 @@ const HeroSection = () => (
 
 const ConnectSection = () => {
   const [isConnecting, setIsConnecting] = useState(false)
-  const router = useRouter();
   const handleGoogleConnect = async () => {
   try {
       setIsConnecting(true)

@@ -3,7 +3,6 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { UserProvider } from "@/context/UserContext";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getChatSessions } from "@/components/api/chatApi";
 import { ChatSessionsProvider } from "@/context/ChatSessionContext";
 // server components do not forward cookie from next/headers, hence why fetch is being used to send reqs
 async function getServerUser(cookieValue: string) {

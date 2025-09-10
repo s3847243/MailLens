@@ -14,14 +14,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { Brain, BrainCircuit, Edit } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@radix-ui/react-dropdown-menu"
-import { Calendar, ChevronDown, ChevronUp, Home, Inbox, MoreHorizontal, Plus, Search, Settings, User2 } from "lucide-react"
+import { ChevronUp,MoreHorizontal, Plus, User2, Edit} from "lucide-react"
 
 import Link from "next/link"
 import { ChatSession } from "@/types";
 import { useState } from "react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useUser } from "@/context/UserContext";
 import { logoutRequest } from "../api/userApi";
 import { deleteUserAccount } from "../api/userApi";
