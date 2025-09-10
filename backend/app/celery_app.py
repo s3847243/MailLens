@@ -4,8 +4,8 @@ import os
 
 from celery import Celery
 
-broker_url = "redis://localhost:6379/1"
-result_backend = "redis://localhost:6379/2"
+broker_url = os.getenv("CELERY_BROKER_URL"),
+result_backend = os.getenv("CELERY_RESULT_BACKEND"),
 timezone = os.getenv("CELERY_TIMEZONE", "Australia/Melbourne")
 celery_app = Celery("maillens", broker=broker_url, backend=result_backend)
 celery_app.conf.update(
