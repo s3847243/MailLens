@@ -8,6 +8,9 @@ broker_url = os.getenv("CELERY_BROKER_URL"),
 result_backend = os.getenv("CELERY_RESULT_BACKEND"),
 timezone = os.getenv("CELERY_TIMEZONE", "Australia/Melbourne")
 celery_app = Celery("maillens", broker=broker_url, backend=result_backend)
+celery_app.conf.broker_transport_options = {
+    "region": os.getenv("AWS_DEFAULT_REGION", "ap-southeast-2")
+}
 celery_app.conf.update(
     timezone=timezone,
     task_serializer="json",

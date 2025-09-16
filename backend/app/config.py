@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     OPENAI_CHAT_MODEL: str | None = None
 
+    @property
+    def allow_origins(self) -> list[str]:
+        return [o.strip() for o in self.ALLOW_ORIGIN.split(",")]
+
     class Config:
         env_file = str(BASE_DIR / ".env")
         extra = "ignore"
