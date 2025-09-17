@@ -88,7 +88,7 @@ const Main = () => {
   const loadExistingChat = useCallback(async (chatId: string) => {
     try {
       setIsLoading(true);
-      const response = await fetch(`http://localhost:8000/api/chats/${chatId}/messages`, {
+      const response = await fetch(`/api/chats/${chatId}/messages`, {
         method: 'GET',
         "credentials": "include",
         headers: {

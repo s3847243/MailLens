@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { ChatSessionsProvider } from "@/context/ChatSessionContext";
 // server components do not forward cookie from next/headers, hence why fetch is being used to send reqs
 async function getServerUser(cookieValue: string) {
-  const res = await fetch('http://localhost:3000/api/me', {
+  const res = await fetch('/api/me', {
     headers: { cookie: `maillens_session=${cookieValue}` },
     cache: 'no-store',
   })
@@ -15,7 +15,7 @@ async function getServerUser(cookieValue: string) {
 }
 
 async function fetchChatSessions(cookieValue: string) {
-  const res = await fetch('http://localhost:3000/chats', {
+  const res = await fetch('/api/chats', {
     headers: { cookie: `maillens_session=${cookieValue}` },
     cache: 'no-store',
   })
