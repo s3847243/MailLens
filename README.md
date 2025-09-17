@@ -30,7 +30,7 @@
 ### Backend Setup  
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/maillens.ai.git
+git clone https://github.com/s3847243/MailLens.git
 cd maillens.ai/backend
 
 # Create virtual environment
