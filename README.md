@@ -44,21 +44,21 @@ pip install -e.
 
 ### Environment Variables
 Create a .env file in the backend directory and fill in the required values:
-
-# ---- Core
+```bash
+ ---- Core
 DATABASE_URL=
 REDIS_URL= 
 ALLOW_ORIGIN=
 SESSION_COOKIE_NAME= 
 
-# ---- Auth / Google (placeholders)
+ ---- Auth / Google (placeholders)
 JWT_SECRET=
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_REDIRECT_URI=
 GOOGLE_OAUTH_SCOPES="openid email profile https://www.googleapis.com/auth/gmail.readonly"
 
-# ---- Vector / LLM
+ ---- Vector / LLM
 PINECONE_API_KEY=
 PINECONE_INDEX=
 EMBEDDING_MODEL=
@@ -68,15 +68,15 @@ ENCRYPTION_KEY=
 APP_BASE_URL=
 OPENAI_CHAT_MODEL=gpt-4o-mini
 
-# ---- Celery
+ ---- Celery
 CELERY_BROKER_URL=
 CELERY_RESULT_BACKEND=
 CELERY_TIMEZONE=
 CELERY_BEAT_ENABLED=
 CELERY_SCHEDULE_MINUTES=
-
-### Run Servives locally
-
+```
+### Run Services locally
+```bash
 #### Start Celery workers
 celery -A app.celery worker --loglevel=info
 
@@ -96,7 +96,7 @@ cp .env.example .env.local
 
 #### Run dev server
 npm run dev
-
+```
 ---
 
 ## Deployment
